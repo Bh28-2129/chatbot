@@ -54,6 +54,9 @@ export const conversationAPI = {
     api.get(`/conversations/${id}`),
   deleteConversation: (id) =>
     api.delete(`/conversations/${id}`)
+  ,
+  updateConversation: (id, title) =>
+    api.patch(`/conversations/${id}`, { title })
 };
 
 export default api;

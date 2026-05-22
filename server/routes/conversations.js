@@ -96,4 +96,33 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// Update conversation title
+router.patch('/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title } = req.body;
+    const userId = req.user.id;
+
+    // Verify ownership
+    const conversationResult = await pool.query(
+      'SELECT * FROM conversations WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
+
+    if (conversationResult.rows.length === 0) {
+      return res.status(403).json({ error: 'Conversation not found' });
+    }
+
+    const updateResult = await pool.query(
+      'UPDATE conversations SET title = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+      [title || conversationResult.rows[0].title, id]
+    );
+
+    res.json(updateResult.rows[0]);
+  } catch (error) {
+    console.error('Update conversation error:', error);
+    res.status(500).json({ error: 'Failed to update conversation' });
+  }
+});
+
 module.exports = router;

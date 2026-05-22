@@ -81,11 +81,11 @@ export default function ChatInterface() {
     }
   }, [messages]);
 
-  
+
   const createNewConversation = async () => {
     try {
       const response = await conversationAPI.createConversation('New Conversation');
-      setConversations([response.data, ...conversations]);
+      setConversations((prev) => [response.data, ...prev]);
       selectConversation(response.data.id);
     } catch (err) {
       setError('Failed to create conversation');
@@ -117,32 +117,39 @@ export default function ChatInterface() {
 
     try {
       // Add user message to UI immediately
-      setMessages([...messages, {
-        role: 'user',
-        content: userMessage,
-        created_at: new Date().toISOString()
-      }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'user',
+          content: userMessage,
+          created_at: new Date().toISOString()
+        }
+      ]);
 
       // Send to API
       const response = await chatAPI.sendMessage(activeConversation.id, userMessage);
 
       // Add AI response
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: response.data.aiResponse,
-        created_at: new Date().toISOString()
-      }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: response.data.aiResponse,
+          created_at: new Date().toISOString()
+        }
+      ]);
 
       // Update conversation title if it's the first message
       if (messages.length === 0 && userMessage.length > 0) {
         const title = userMessage.substring(0, 50);
-        await conversationAPI.createConversation(title);
+        // Update the active conversation title on the server
+        await conversationAPI.updateConversation(activeConversation.id, title);
         fetchConversations();
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to send message');
       // Remove the user message if it failed
-      setMessages(prev => prev.slice(0, -1));
+      setMessages((prev) => prev.slice(0, -1));
     } finally {
       setLoading(false);
     }
@@ -237,7 +244,7 @@ export default function ChatInterface() {
                 <textarea
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  onKeyPress={handleKeyPress}
+                  onKeyDown={handleKeyPress}
                   placeholder="Type your message... (Shift+Enter for new line)"
                   disabled={loading}
                   rows="3"
