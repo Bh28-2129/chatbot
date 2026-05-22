@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { FiPlus, FiTrash2, FiMenu, FiX } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
@@ -17,11 +17,44 @@ export default function ChatInterface() {
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
 
+  // Stable selectConversation so fetchConversations can call it safely
+  const selectConversation = useCallback(async (conversationId) => {
+    try {
+      const response = await conversationAPI.getConversation(conversationId);
+      setActiveConversation(response.data.conversation);
+      setMessages(response.data.messages);
+      // persist last opened conversation
+      localStorage.setItem('lastConversationId', conversationId);
+    } catch (err) {
+      setError('Failed to load conversation');
+    }
+  }, []);
+
+  const fetchConversations = useCallback(async () => {
+    try {
+      const response = await conversationAPI.getConversations();
+      setConversations(response.data);
+      // auto-select last conversation if available
+      const lastId = localStorage.getItem('lastConversationId');
+      if (lastId) {
+        const exists = response.data.find(c => String(c.id) === String(lastId));
+        if (exists) {
+          selectConversation(lastId);
+          return;
+        }
+      }
+      if (response.data.length > 0) {
+        selectConversation(response.data[0].id);
+      }
+    } catch (err) {
+      console.error('Failed to fetch conversations:', err);
+    }
+  }, [selectConversation]);
+
   // Fetch conversations on mount
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchConversations();
-  }, []);
+  }, [fetchConversations]);
 
   // Ensure sidebar is visible when switching back to larger screens
   useEffect(() => {
@@ -48,27 +81,7 @@ export default function ChatInterface() {
     }
   }, [messages]);
 
-  const fetchConversations = async () => {
-    try {
-      const response = await conversationAPI.getConversations();
-      setConversations(response.data);
-      // auto-select last conversation if available
-      const lastId = localStorage.getItem('lastConversationId');
-      if (lastId) {
-        const exists = response.data.find(c => String(c.id) === String(lastId));
-        if (exists) {
-          selectConversation(lastId);
-          return;
-        }
-      }
-      if (response.data.length > 0) {
-        selectConversation(response.data[0].id);
-      }
-    } catch (err) {
-      console.error('Failed to fetch conversations:', err);
-    }
-  };
-
+  
   const createNewConversation = async () => {
     try {
       const response = await conversationAPI.createConversation('New Conversation');
@@ -79,17 +92,7 @@ export default function ChatInterface() {
     }
   };
 
-  const selectConversation = async (conversationId) => {
-    try {
-      const response = await conversationAPI.getConversation(conversationId);
-      setActiveConversation(response.data.conversation);
-      setMessages(response.data.messages);
-      // persist last opened conversation
-      localStorage.setItem('lastConversationId', conversationId);
-    } catch (err) {
-      setError('Failed to load conversation');
-    }
-  };
+  
 
   const deleteConversation = async (conversationId) => {
     try {
